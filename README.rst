@@ -13,10 +13,6 @@ Scrapy
 .. image:: https://img.shields.io/badge/wheel-yes-brightgreen.svg
    :target: https://pypi.python.org/pypi/Scrapy
    :alt: Wheel Status
-   
-.. image:: http://static.scrapy.org/py3progress/badge.svg
-   :target: https://github.com/scrapy/scrapy/wiki/Python-3-Porting
-   :alt: Python 3 Porting Status
 
 .. image:: https://img.shields.io/codecov/c/github/scrapy/scrapy/master.svg
    :target: http://codecov.io/github/scrapy/scrapy?branch=master
@@ -53,17 +49,16 @@ The quick way::
 For more details see the install section in the documentation:
 http://doc.scrapy.org/en/latest/intro/install.html
 
-Releases
-========
-
-You can download the latest stable and development releases from:
-http://scrapy.org/download/
-
 Documentation
 =============
 
 Documentation is available online at http://doc.scrapy.org/ and in the ``docs``
 directory.
+
+Releases
+========
+
+You can find release notes at https://doc.scrapy.org/en/latest/news.html
 
 Community (blog, twitter, mail list, IRC)
 =========================================
@@ -73,13 +68,16 @@ See http://scrapy.org/community/
 Contributing
 ============
 
+See http://doc.scrapy.org/en/master/contributing.html
+
+Code of Conduct
+---------------
+
 Please note that this project is released with a Contributor Code of Conduct
 (see https://github.com/scrapy/scrapy/blob/master/CODE_OF_CONDUCT.md).
 
 By participating in this project you agree to abide by its terms.
 Please report unacceptable behavior to opensource@scrapinghub.com.
-
-See http://doc.scrapy.org/en/master/contributing.html
 
 Companies using Scrapy
 ======================

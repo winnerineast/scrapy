@@ -1,3 +1,4 @@
+import logging
 from unittest import TestCase
 
 from testfixtures import LogCapture
@@ -59,7 +60,8 @@ def _responses(request, status_codes):
 class TestHttpErrorMiddleware(TestCase):
 
     def setUp(self):
-        self.spider = Spider('foo')
+        crawler = get_crawler(Spider)
+        self.spider = Spider.from_crawler(crawler, name='foo')
         self.mw = HttpErrorMiddleware(Settings({}))
         self.req = Request('http://scrapytest.org')
         self.res200, self.res404 = _responses(self.req, [200, 404])
@@ -72,10 +74,10 @@ class TestHttpErrorMiddleware(TestCase):
 
     def test_process_spider_exception(self):
         self.assertEquals([],
-                self.mw.process_spider_exception(self.res404, \
+                self.mw.process_spider_exception(self.res404,
                         HttpError(self.res404), self.spider))
         self.assertEquals(None,
-                self.mw.process_spider_exception(self.res404, \
+                self.mw.process_spider_exception(self.res404,
                         Exception(), self.spider))
 
     def test_handle_httpstatus_list(self):
@@ -172,6 +174,12 @@ class TestHttpErrorMiddlewareIntegrational(TrialTestCase):
         self.assertEqual(crawler.spider.parsed, {'200'})
         self.assertEqual(crawler.spider.failed, {'404', '402', '500'})
 
+        get_value = crawler.stats.get_value
+        self.assertEqual(get_value('httperror/response_ignored_count'), 3)
+        self.assertEqual(get_value('httperror/response_ignored_status_count/404'), 1)
+        self.assertEqual(get_value('httperror/response_ignored_status_count/402'), 1)
+        self.assertEqual(get_value('httperror/response_ignored_status_count/500'), 1)
+
     @defer.inlineCallbacks
     def test_logging(self):
         crawler = get_crawler(_HttpErrorSpider)
@@ -185,3 +193,29 @@ class TestHttpErrorMiddlewareIntegrational(TrialTestCase):
         self.assertIn('Ignoring response <500', str(log))
         self.assertNotIn('Ignoring response <200', str(log))
         self.assertNotIn('Ignoring response <402', str(log))
+
+    @defer.inlineCallbacks
+    def test_logging_level(self):
+        # HttpError logs ignored responses with level INFO
+        crawler = get_crawler(_HttpErrorSpider)
+        with LogCapture(level=logging.INFO) as log:
+            yield crawler.crawl()
+        self.assertEqual(crawler.spider.parsed, {'200'})
+        self.assertEqual(crawler.spider.failed, {'404', '402', '500'})
+
+        self.assertIn('Ignoring response <402', str(log))
+        self.assertIn('Ignoring response <404', str(log))
+        self.assertIn('Ignoring response <500', str(log))
+        self.assertNotIn('Ignoring response <200', str(log))
+
+        # with level WARNING, we shouldn't capture anything from HttpError
+        crawler = get_crawler(_HttpErrorSpider)
+        with LogCapture(level=logging.WARNING) as log:
+            yield crawler.crawl()
+        self.assertEqual(crawler.spider.parsed, {'200'})
+        self.assertEqual(crawler.spider.failed, {'404', '402', '500'})
+
+        self.assertNotIn('Ignoring response <402', str(log))
+        self.assertNotIn('Ignoring response <404', str(log))
+        self.assertNotIn('Ignoring response <500', str(log))
+        self.assertNotIn('Ignoring response <200', str(log))

@@ -22,7 +22,7 @@ There are many ways to contribute to Scrapy. Here are some of them:
   `Writing patches`_ and `Submitting patches`_ below for details on how to
   write and submit a patch.
 
-* Join the `scrapy-users`_ mailing list and share your ideas on how to
+* Join the `Scrapy subreddit`_ and share your ideas on how to
   improve Scrapy. We're always open to suggestions.
 
 Reporting bugs
@@ -44,9 +44,9 @@ guidelines when reporting a new bug.
   don't dismiss the report but check the ticket history and comments, you may
   find additional useful information to contribute.
 
-* search the `scrapy-users`_ list to see if it has been discussed there, or
-  if you're not sure if what you're seeing is a bug. You can also ask in the
-  `#scrapy` IRC channel.
+* search the `scrapy-users`_ list and `Scrapy subreddit`_ to see if it has
+  been discussed there, or if you're not sure if what you're seeing is a bug.
+  You can also ask in the `#scrapy` IRC channel.
 
 * write **complete, reproducible, specific bug reports**. The smaller the test
   case, the better. Remember that other developers won't have your project to
@@ -98,8 +98,8 @@ patch, but it's always good to have a patch ready to illustrate your arguments
 and show that you have put some additional thought into the subject. A good
 starting point is to send a pull request on GitHub. It can be simple enough to
 illustrate your idea, and leave documentation/tests for later, after the idea
-has been validated and proven useful. Alternatively, you can send an email to
-`scrapy-users`_ to discuss your idea first.
+has been validated and proven useful. Alternatively, you can start a
+conversation in the `Scrapy subreddit`_ to discuss your idea first.
 When writing GitHub pull requests, try to keep titles short but descriptive.
 E.g. For bug #411: "Scrapy hangs if an exception raises in start_requests"
 prefer "Fix hanging when exception occurs in start_requests (#411)"
@@ -123,15 +123,6 @@ Scrapy:
 
 * Don't put your name in the code you contribute. Our policy is to keep
   the contributor's name in the `AUTHORS`_ file distributed with Scrapy.
-
-Scrapy Contrib
-==============
-
-Scrapy contrib shares a similar rationale as Django contrib, which is explained
-in `this post <https://jacobian.org/writing/what-is-django-contrib/>`_. If you
-are working on a new functionality, please follow that rationale to decide
-whether it should be a Scrapy contrib. If unsure, you can ask in
-`scrapy-users`_.
 
 Documentation policies
 ======================
@@ -197,6 +188,7 @@ And their unit-tests are in::
 
 .. _issue tracker: https://github.com/scrapy/scrapy/issues
 .. _scrapy-users: https://groups.google.com/forum/#!forum/scrapy-users
+.. _Scrapy subreddit: http://reddit.com/r/scrapy
 .. _Twisted unit-testing framework: https://twistedmatrix.com/documents/current/core/development/policy/test-standard.html
 .. _AUTHORS: https://github.com/scrapy/scrapy/blob/master/AUTHORS
 .. _tests/: https://github.com/scrapy/scrapy/tree/master/tests
