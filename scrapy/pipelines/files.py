@@ -5,19 +5,14 @@ See documentation in topics/media-pipeline.rst
 """
 import functools
 import hashlib
-import os
-import os.path
-import time
 import logging
-from email.utils import parsedate_tz, mktime_tz
-from six.moves.urllib.parse import urlparse
+import mimetypes
+import os
+import time
 from collections import defaultdict
-import six
-
-try:
-    from cStringIO import StringIO as BytesIO
-except ImportError:
-    from io import BytesIO
+from email.utils import parsedate_tz, mktime_tz
+from io import BytesIO
+from urllib.parse import urlparse
 
 from twisted.internet import defer, threads
 
@@ -32,6 +27,7 @@ from scrapy.utils.request import referer_str
 from scrapy.utils.boto import is_botocore
 from scrapy.utils.datatypes import CaselessDict
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,7 +36,6 @@ class FileException(Exception):
 
 
 class FSFilesStore(object):
-
     def __init__(self, basedir):
         if '://' in basedir:
             basedir = basedir.split('://', 1)[1]
@@ -79,9 +74,12 @@ class FSFilesStore(object):
 
 
 class S3FilesStore(object):
-
     AWS_ACCESS_KEY_ID = None
     AWS_SECRET_ACCESS_KEY = None
+    AWS_ENDPOINT_URL = None
+    AWS_REGION_NAME = None
+    AWS_USE_SSL = None
+    AWS_VERIFY = None
 
     POLICY = 'private'  # Overriden from settings.FILES_STORE_S3_ACL in
                         # FilesPipeline.from_settings.
@@ -95,8 +93,14 @@ class S3FilesStore(object):
             import botocore.session
             session = botocore.session.get_session()
             self.s3_client = session.create_client(
-                's3', aws_access_key_id=self.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=self.AWS_SECRET_ACCESS_KEY)
+                's3',
+                aws_access_key_id=self.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=self.AWS_SECRET_ACCESS_KEY,
+                endpoint_url=self.AWS_ENDPOINT_URL,
+                region_name=self.AWS_REGION_NAME,
+                use_ssl=self.AWS_USE_SSL,
+                verify=self.AWS_VERIFY
+            )
         else:
             from boto.s3.connection import S3Connection
             self.S3Connection = S3Connection
@@ -148,14 +152,14 @@ class S3FilesStore(object):
                 Bucket=self.bucket,
                 Key=key_name,
                 Body=buf,
-                Metadata={k: str(v) for k, v in six.iteritems(meta or {})},
+                Metadata={k: str(v) for k, v in (meta or {}).items()},
                 ACL=self.POLICY,
                 **extra)
         else:
             b = self._get_boto_bucket()
             k = b.new_key(key_name)
             if meta:
-                for metakey, metavalue in six.iteritems(meta):
+                for metakey, metavalue in meta.items():
                     k.set_metadata(metakey, str(metavalue))
             h = self.HEADERS.copy()
             if headers:
@@ -181,9 +185,22 @@ class S3FilesStore(object):
             'X-Amz-Grant-Read': 'GrantRead',
             'X-Amz-Grant-Read-ACP': 'GrantReadACP',
             'X-Amz-Grant-Write-ACP': 'GrantWriteACP',
-            })
+            'X-Amz-Object-Lock-Legal-Hold': 'ObjectLockLegalHoldStatus',
+            'X-Amz-Object-Lock-Mode': 'ObjectLockMode',
+            'X-Amz-Object-Lock-Retain-Until-Date': 'ObjectLockRetainUntilDate',
+            'X-Amz-Request-Payer': 'RequestPayer',
+            'X-Amz-Server-Side-Encryption': 'ServerSideEncryption',
+            'X-Amz-Server-Side-Encryption-Aws-Kms-Key-Id': 'SSEKMSKeyId',
+            'X-Amz-Server-Side-Encryption-Context': 'SSEKMSEncryptionContext',
+            'X-Amz-Server-Side-Encryption-Customer-Algorithm': 'SSECustomerAlgorithm',
+            'X-Amz-Server-Side-Encryption-Customer-Key': 'SSECustomerKey',
+            'X-Amz-Server-Side-Encryption-Customer-Key-Md5': 'SSECustomerKeyMD5',
+            'X-Amz-Storage-Class': 'StorageClass',
+            'X-Amz-Tagging': 'Tagging',
+            'X-Amz-Website-Redirect-Location': 'WebsiteRedirectLocation',
+        })
         extra = {}
-        for key, value in six.iteritems(headers):
+        for key, value in headers.items():
             try:
                 kwarg = mapping[key]
             except KeyError:
@@ -199,6 +216,10 @@ class GCSFilesStore(object):
     GCS_PROJECT_ID = None
 
     CACHE_CONTROL = 'max-age=172800'
+
+    # The bucket's default object ACL will be applied to the object.
+    # Overriden from settings.FILES_STORE_GCS_ACL in FilesPipeline.from_settings.
+    POLICY = None
 
     def __init__(self, uri):
         from google.cloud import storage
@@ -227,11 +248,12 @@ class GCSFilesStore(object):
     def persist_file(self, path, buf, info, meta=None, headers=None):
         blob = self.bucket.blob(self.prefix + path)
         blob.cache_control = self.CACHE_CONTROL
-        blob.metadata = {k: str(v) for k, v in six.iteritems(meta or {})}
+        blob.metadata = {k: str(v) for k, v in (meta or {}).items()}
         return threads.deferToThread(
             blob.upload_from_string,
             data=buf.getvalue(),
-            content_type=self._get_content_type(headers)
+            content_type=self._get_content_type(headers),
+            predefined_acl=self.POLICY
         )
 
 
@@ -242,13 +264,13 @@ class FilesPipeline(MediaPipeline):
     doing stat of the files and determining if file is new, uptodate or
     expired.
 
-    `new` files are those that pipeline never processed and needs to be
+    ``new`` files are those that pipeline never processed and needs to be
         downloaded from supplier site the first time.
 
-    `uptodate` files are the ones that the pipeline processed and are still
+    ``uptodate`` files are the ones that the pipeline processed and are still
         valid files.
 
-    `expired` files are those that pipeline already processed but the last
+    ``expired`` files are those that pipeline already processed but the last
         modification was made long time ago, so a reprocessing is recommended to
         refresh it in case of change.
 
@@ -298,10 +320,15 @@ class FilesPipeline(MediaPipeline):
         s3store = cls.STORE_SCHEMES['s3']
         s3store.AWS_ACCESS_KEY_ID = settings['AWS_ACCESS_KEY_ID']
         s3store.AWS_SECRET_ACCESS_KEY = settings['AWS_SECRET_ACCESS_KEY']
+        s3store.AWS_ENDPOINT_URL = settings['AWS_ENDPOINT_URL']
+        s3store.AWS_REGION_NAME = settings['AWS_REGION_NAME']
+        s3store.AWS_USE_SSL = settings['AWS_USE_SSL']
+        s3store.AWS_VERIFY = settings['AWS_VERIFY']
         s3store.POLICY = settings['FILES_STORE_S3_ACL']
 
         gcs_store = cls.STORE_SCHEMES['gs']
         gcs_store.GCS_PROJECT_ID = settings['GCS_PROJECT_ID']
+        gcs_store.POLICY = settings['FILES_STORE_GCS_ACL'] or None
 
         store_uri = settings['FILES_STORE']
         return cls(store_uri, settings=settings)
@@ -440,32 +467,13 @@ class FilesPipeline(MediaPipeline):
         return item
 
     def file_path(self, request, response=None, info=None):
-        ## start of deprecation warning block (can be removed in the future)
-        def _warn():
-            from scrapy.exceptions import ScrapyDeprecationWarning
-            import warnings
-            warnings.warn('FilesPipeline.file_key(url) method is deprecated, please use '
-                          'file_path(request, response=None, info=None) instead',
-                          category=ScrapyDeprecationWarning, stacklevel=1)
-
-        # check if called from file_key with url as first argument
-        if not isinstance(request, Request):
-            _warn()
-            url = request
-        else:
-            url = request.url
-
-        # detect if file_key() method has been overridden
-        if not hasattr(self.file_key, '_base'):
-            _warn()
-            return self.file_key(url)
-        ## end of deprecation warning block
-
-        media_guid = hashlib.sha1(to_bytes(url)).hexdigest()  # change to request.url after deprecation
-        media_ext = os.path.splitext(url)[1]  # change to request.url after deprecation
+        media_guid = hashlib.sha1(to_bytes(request.url)).hexdigest()
+        media_ext = os.path.splitext(request.url)[1]
+        # Handles empty and wild extensions by trying to guess the
+        # mime type then extension or default to empty string otherwise
+        if media_ext not in mimetypes.types_map:
+            media_ext = ''
+            media_type = mimetypes.guess_type(request.url)[0]
+            if media_type:
+                media_ext = mimetypes.guess_extension(media_type)
         return 'full/%s%s' % (media_guid, media_ext)
-
-    # deprecated
-    def file_key(self, url):
-        return self.file_path(url)
-    file_key._base = True

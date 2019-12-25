@@ -5,32 +5,40 @@ from scrapy.squeues import MarshalFifoDiskQueue, MarshalLifoDiskQueue, PickleFif
 from scrapy.item import Item, Field
 from scrapy.http import Request
 from scrapy.loader import ItemLoader
+from scrapy.selector import Selector
+
 
 class TestItem(Item):
     name = Field()
 
+
 def _test_procesor(x):
     return x + x
+
 
 class TestLoader(ItemLoader):
     default_item_class = TestItem
     name_out = staticmethod(_test_procesor)
 
+
 def nonserializable_object_test(self):
+    q = self.queue()
     try:
         pickle.dumps(lambda x: x)
     except Exception:
         # Trigger Twisted bug #7989
         import twisted.persisted.styles  # NOQA
-        q = self.queue()
         self.assertRaises(ValueError, q.push, lambda x: x)
     else:
         # Use a different unpickleable object
         class A(object): pass
         a = A()
         a.__reduce__ = a.__reduce_ex__ = None
-        q = self.queue()
         self.assertRaises(ValueError, q.push, a)
+    # Selectors should fail (lxml.html.HtmlElement objects can't be pickled)
+    sel = Selector(text='<html><body><p>some text</p></body></html>')
+    self.assertRaises(ValueError, q.push, sel)
+
 
 class MarshalFifoDiskQueueTest(t.FifoDiskQueueTest):
 
@@ -50,14 +58,18 @@ class MarshalFifoDiskQueueTest(t.FifoDiskQueueTest):
 
     test_nonserializable_object = nonserializable_object_test
 
+
 class ChunkSize1MarshalFifoDiskQueueTest(MarshalFifoDiskQueueTest):
     chunksize = 1
+
 
 class ChunkSize2MarshalFifoDiskQueueTest(MarshalFifoDiskQueueTest):
     chunksize = 2
 
+
 class ChunkSize3MarshalFifoDiskQueueTest(MarshalFifoDiskQueueTest):
     chunksize = 3
+
 
 class ChunkSize4MarshalFifoDiskQueueTest(MarshalFifoDiskQueueTest):
     chunksize = 4
@@ -97,14 +109,18 @@ class PickleFifoDiskQueueTest(MarshalFifoDiskQueueTest):
         self.assertEqual(r.url, r2.url)
         assert r2.meta['request'] is r2
 
+
 class ChunkSize1PickleFifoDiskQueueTest(PickleFifoDiskQueueTest):
     chunksize = 1
+
 
 class ChunkSize2PickleFifoDiskQueueTest(PickleFifoDiskQueueTest):
     chunksize = 2
 
+
 class ChunkSize3PickleFifoDiskQueueTest(PickleFifoDiskQueueTest):
     chunksize = 3
+
 
 class ChunkSize4PickleFifoDiskQueueTest(PickleFifoDiskQueueTest):
     chunksize = 4
