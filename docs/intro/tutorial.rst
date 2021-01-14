@@ -25,16 +25,16 @@ Scrapy.
 If you're already familiar with other languages, and want to learn Python quickly, the `Python Tutorial`_ is a good resource.
 
 If you're new to programming and want to start with Python, the following books
-may be useful to you: 
+may be useful to you:
 
 * `Automate the Boring Stuff With Python`_
 
-* `How To Think Like a Computer Scientist`_ 
+* `How To Think Like a Computer Scientist`_
 
-* `Learn Python 3 The Hard Way`_ 
+* `Learn Python 3 The Hard Way`_
 
 You can also take a look at `this list of Python resources for non-programmers`_,
-as well as the `suggested resources in the learnpython-subreddit`_. 
+as well as the `suggested resources in the learnpython-subreddit`_.
 
 .. _Python: https://www.python.org/
 .. _this list of Python resources for non-programmers: https://wiki.python.org/moin/BeginnersGuide/NonProgrammers
@@ -62,7 +62,7 @@ This will create a ``tutorial`` directory with the following contents::
             __init__.py
 
             items.py          # project items definition file
-            
+
             middlewares.py    # project middlewares file
 
             pipelines.py      # project pipelines file
@@ -101,10 +101,10 @@ This is the code for our first Spider. Save it in a file named
 
         def parse(self, response):
             page = response.url.split("/")[-2]
-            filename = 'quotes-%s.html' % page
+            filename = f'quotes-{page}.html'
             with open(filename, 'wb') as f:
                 f.write(response.body)
-            self.log('Saved file %s' % filename)
+            self.log(f'Saved file {filename}')
 
 
 As you can see, our Spider subclasses :class:`scrapy.Spider <scrapy.spiders.Spider>`
@@ -190,7 +190,7 @@ for your spider::
 
         def parse(self, response):
             page = response.url.split("/")[-2]
-            filename = 'quotes-%s.html' % page
+            filename = f'quotes-{page}.html'
             with open(filename, 'wb') as f:
                 f.write(response.body)
 
@@ -212,7 +212,7 @@ using the :ref:`Scrapy shell <topics-shell>`. Run::
 .. note::
 
    Remember to always enclose urls in quotes when running Scrapy shell from
-   command-line, otherwise urls containing arguments (ie. ``&`` character)
+   command-line, otherwise urls containing arguments (i.e. ``&`` character)
    will not work.
 
    On Windows, use double quotes instead::
@@ -287,8 +287,8 @@ to be scraped, you can at least get **some** data.
 
 Besides the :meth:`~scrapy.selector.SelectorList.getall` and
 :meth:`~scrapy.selector.SelectorList.get` methods, you can also use
-the :meth:`~scrapy.selector.SelectorList.re` method to extract using `regular
-expressions`_:
+the :meth:`~scrapy.selector.SelectorList.re` method to extract using
+:doc:`regular expressions <library/re>`:
 
 >>> response.css('title::text').re(r'Quotes.*')
 ['Quotes to Scrape']
@@ -305,8 +305,7 @@ with a selector (see :ref:`topics-developer-tools`).
 `Selector Gadget`_ is also a nice tool to quickly find CSS selector for
 visually selected elements, which works in many browsers.
 
-.. _regular expressions: https://docs.python.org/3/library/re.html
-.. _Selector Gadget: http://selectorgadget.com/
+.. _Selector Gadget: https://selectorgadget.com/
 
 
 XPath: a brief intro
@@ -337,7 +336,7 @@ recommend `this tutorial to learn XPath through examples
 <http://zvon.org/comp/r/tut-XPath_1.html>`_, and `this tutorial to learn "how
 to think in XPath" <http://plasmasturm.org/log/xpath101/>`_.
 
-.. _XPath: https://www.w3.org/TR/xpath
+.. _XPath: https://www.w3.org/TR/xpath/all/
 .. _CSS: https://www.w3.org/TR/selectors
 
 Extracting quotes and authors
@@ -406,8 +405,6 @@ to get all of them:
 
   from sys import version_info
 
-.. skip: next if(version_info < (3, 6), reason="Only Python 3.6+ dictionaries match the output")
-
 Having figured out how to extract each bit, we can now iterate over all the
 quotes elements and put them together into a Python dictionary:
 
@@ -465,16 +462,15 @@ Storing the scraped data
 The simplest way to store the scraped data is by using :ref:`Feed exports
 <topics-feed-exports>`, with the following command::
 
-    scrapy crawl quotes -o quotes.json
+    scrapy crawl quotes -O quotes.json
 
 That will generate an ``quotes.json`` file containing all scraped items,
 serialized in `JSON`_.
 
-For historic reasons, Scrapy appends to a given file instead of overwriting
-its contents. If you run this command twice without removing the file
-before the second time, you'll end up with a broken JSON file.
-
-You can also use other formats, like `JSON Lines`_::
+The ``-O`` command-line switch overwrites any existing file; use ``-o`` instead
+to append new content to any existing file. However, appending to a JSON file
+makes the file contents invalid JSON. When appending to a file, consider
+using a different serialization format, such as `JSON Lines`_::
 
     scrapy crawl quotes -o quotes.jl
 
@@ -616,21 +612,25 @@ instance; you still have to yield this Request.
 You can also pass a selector to ``response.follow`` instead of a string;
 this selector should extract necessary attributes::
 
-    for href in response.css('li.next a::attr(href)'):
+    for href in response.css('ul.pager a::attr(href)'):
         yield response.follow(href, callback=self.parse)
 
 For ``<a>`` elements there is a shortcut: ``response.follow`` uses their href
 attribute automatically. So the code can be shortened further::
 
-    for a in response.css('li.next a'):
+    for a in response.css('ul.pager a'):
         yield response.follow(a, callback=self.parse)
 
-.. note::
+To create multiple requests from an iterable, you can use
+:meth:`response.follow_all <scrapy.http.TextResponse.follow_all>` instead::
 
-    ``response.follow(response.css('li.next a'))`` is not valid because
-    ``response.css`` returns a list-like object with selectors for all results,
-    not a single selector. A ``for`` loop like in the example above, or
-    ``response.follow(response.css('li.next a')[0])`` is fine.
+    anchors = response.css('ul.pager a')
+    yield from response.follow_all(anchors, callback=self.parse)
+
+or, shortening it further::
+
+    yield from response.follow_all(css='ul.pager a', callback=self.parse)
+
 
 More examples and patterns
 --------------------------
@@ -647,13 +647,11 @@ this time for scraping author information::
         start_urls = ['http://quotes.toscrape.com/']
 
         def parse(self, response):
-            # follow links to author pages
-            for href in response.css('.author + a::attr(href)'):
-                yield response.follow(href, self.parse_author)
+            author_page_links = response.css('.author + a')
+            yield from response.follow_all(author_page_links, self.parse_author)
 
-            # follow pagination links
-            for href in response.css('li.next a::attr(href)'):
-                yield response.follow(href, self.parse)
+            pagination_links = response.css('li.next a')
+            yield from response.follow_all(pagination_links, self.parse)
 
         def parse_author(self, response):
             def extract_with_css(query):
@@ -669,8 +667,10 @@ This spider will start from the main page, it will follow all the links to the
 authors pages calling the ``parse_author`` callback for each of them, and also
 the pagination links with the ``parse`` callback as we saw before.
 
-Here we're passing callbacks to ``response.follow`` as positional arguments
-to make the code shorter; it also works for ``scrapy.Request``.
+Here we're passing callbacks to
+:meth:`response.follow_all <scrapy.http.TextResponse.follow_all>` as positional
+arguments to make the code shorter; it also works for
+:class:`~scrapy.http.Request`.
 
 The ``parse_author`` callback defines a helper function to extract and cleanup the
 data from a CSS query and yields the Python dict with the author data.
@@ -701,7 +701,7 @@ Using spider arguments
 You can provide command line arguments to your spiders by using the ``-a``
 option when running them::
 
-    scrapy crawl quotes -o quotes-humor.json -a tag=humor
+    scrapy crawl quotes -O quotes-humor.json -a tag=humor
 
 These arguments are passed to the Spider's ``__init__`` method and become
 spider attributes by default.
